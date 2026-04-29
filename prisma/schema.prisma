@@ -1,0 +1,54 @@
+// LiveStream App - Prisma Schema
+// Simulates Firebase Firestore for room management & chat
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  avatar    String?
+  role      String   @default("viewer") // "host" | "viewer"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  rooms    LiveRoom[]
+  messages ChatMessage[]
+}
+
+model LiveRoom {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  hostId      String
+  host        User     @relation(fields: [hostId], references: [id])
+  channelId   String   @unique          // Agora channel name
+  isLive      Boolean  @default(true)
+  viewerCount Int      @default(0)
+  tags        String?                    // comma-separated tags
+  thumbnail   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  messages ChatMessage[]
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  roomId    String
+  room      LiveRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  userName  String
+  userAvatar String?
+  message   String
+  type      String   @default("text") // "text" | "system" | "gift"
+  createdAt DateTime @default(now())
+}
