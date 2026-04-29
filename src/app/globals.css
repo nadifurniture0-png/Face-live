@@ -78,7 +78,7 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
-/* ─── Base Styles ─────────────────────────────────────────── */
+/* â”€â”€â”€ Base Styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 @layer base {
   * {
@@ -89,7 +89,7 @@
   }
 }
 
-/* ─── Custom Scrollbar (Streaming dark theme) ─────────────── */
+/* â”€â”€â”€ Custom Scrollbar (Streaming dark theme) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .scrollbar-thin {
   scrollbar-width: thin;
@@ -113,7 +113,7 @@
   background-color: rgba(63, 63, 70, 0.8);
 }
 
-/* ─── Video Canvas Fullscreen Fix ─────────────────────────── */
+/* â”€â”€â”€ Video Canvas Fullscreen Fix â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 canvas {
   display: block;
@@ -123,7 +123,34 @@ video {
   display: block;
 }
 
-/* ─── Mobile Touch Optimizations ──────────────────────────── */
+/* â”€â”€â”€ Agora Video Fullscreen Override â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* Force any <video> inside the Agora container to cover fully */
+.agora-video-container video,
+.agora-video-player video,
+video[style*="position"] {
+  object-fit: cover !important;
+}
+
+/* â”€â”€â”€ iOS Safe Area Insets â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+
+@supports (padding-top: env(safe-area-inset-top)) {
+  .pt-safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .pb-safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* â”€â”€â”€ Fullscreen immersive (no scrollbars, no overscroll) â”€ */
+
+.fullscreen-immersive {
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: auto;
+}
+
+/* â”€â”€â”€ Mobile Touch Optimizations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 @media (max-width: 640px) {
   * {
@@ -136,7 +163,7 @@ video {
   }
 }
 
-/* ─── Pulse animation for LIVE indicators ─────────────────── */
+/* â”€â”€â”€ Pulse animation for LIVE indicators â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 @keyframes pulse-glow {
   0%, 100% {
@@ -151,7 +178,7 @@ video {
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
-/* ─── Chat message entrance animation ─────────────────────── */
+/* â”€â”€â”€ Chat message entrance animation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 @keyframes slide-up {
   from {
@@ -168,7 +195,7 @@ video {
   animation: slide-up 0.2s ease-out;
 }
 
-/* ─── Gradient text utility ───────────────────────────────── */
+/* â”€â”€â”€ Gradient text utility â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .gradient-text {
   background: linear-gradient(135deg, #a855f7 0%, #ef4444 100%);
