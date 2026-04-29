@@ -1,0 +1,20 @@
+// ================================================================
+// StreamLive — DEVELOPMENT Firebase Rules (Testing)
+// ================================================================
+// ⚠️  USE THIS ONLY FOR LOCAL TESTING / DEVELOPMENT
+// ⚠️  DO NOT USE IN PRODUCTION — Allows full read/write to anyone
+//
+// Deploy:
+//   firebase deploy --only firestore:rules
+// ================================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Allow everything for testing
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

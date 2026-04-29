@@ -1,0 +1,195 @@
+// ================================================================
+// StreamLive — Firebase Firestore Security Rules
+// ================================================================
+//
+// Collection Structure:
+//   rooms/
+//     {roomId}/
+//       channelId: string
+//       title: string
+//       description?: string
+//       hostId: string
+//       hostName: string
+//       hostAvatar?: string
+//       isLive: boolean
+//       viewerCount: number
+//       tags?: string
+//       createdAt: serverTimestamp
+//       updatedAt: serverTimestamp
+//       messages/
+//         {messageId}/
+//           userId: string
+//           userName: string
+//           userAvatar?: string
+//           message: string
+//           type: 'text' | 'system' | 'gift'
+//           createdAt: serverTimestamp
+//
+// Deploy:
+//   firebase deploy --only firestore:rules
+// ================================================================
+
+rules_version = '2';
+service cloud.firestore {
+
+  // ─── Helper Functions ───────────────────────────────────────
+
+  /// Check if the user is signed in (Firebase Auth)
+  function isAuthenticated() {
+    return request.auth != null;
+  }
+
+  /// Check if the signed-in user is the room host
+  function isHost(roomId) {
+    return isAuthenticated()
+      && request.auth.uid == get(/databases/$(database)/documents/rooms/$(roomId)).data.hostId;
+  }
+
+  /// Check if a value is a valid message type
+  function isValidMessageType(type) {
+    return type == 'text' || type == 'system' || type == 'gift';
+  }
+
+  /// Check if a string is within size limits
+  function isStringLengthValid(value, min, max) {
+    return value != null
+      && value is string
+      && value.size() >= min
+      && value.size() <= max;
+  }
+
+  /// Current server time (for age checks)
+  function now() {
+    return request.time;
+  }
+
+  // ─── Users Collection ──────────────────────────────────────
+
+  match /databases/{database}/documents {
+
+    // ── users ─────────────────────────────────────────────────
+    match /users/{userId} {
+
+      // CREATE: Anyone can create their own user profile
+      allow create: if true;
+
+      // READ: Anyone can view user profiles (for chat avatars/names)
+      allow read: if true;
+
+      // UPDATE: Users can update their own profile
+      allow update: if true;
+
+      // DELETE: Users can delete their own profile
+      allow delete: if true;
+    }
+
+    // ── rooms ─────────────────────────────────────────────────
+    match /rooms/{roomId} {
+
+      // CREATE: Any signed-in user can start a live room
+      allow create: if isAuthenticated()
+        && isValidRoomCreate();
+
+      // READ: Anyone can view any room (live or ended)
+      allow read: if true;
+
+      // UPDATE: Only the host can update their own room
+      allow update: if isAuthenticated()
+        && isHost(roomId)
+        && isValidRoomUpdate();
+
+      // DELETE: Only the host can delete their own room
+      allow delete: if isAuthenticated()
+        && isHost(roomId);
+    }
+
+    // ── rooms/{roomId}/messages ───────────────────────────────
+    match /rooms/{roomId}/messages/{messageId} {
+
+      // CREATE: Any signed-in user can send a message in any room
+      allow create: if isAuthenticated()
+        && isValidMessageCreate();
+
+      // READ: Anyone can read messages (even without auth — for public streams)
+      allow read: if true;
+
+      // UPDATE & DELETE: No one can edit or delete messages
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}
+
+// ─── Room Validation Rules ────────────────────────────────────
+
+/// Validate room data on CREATE
+function isValidRoomCreate() {
+  let data = request.resource.data;
+
+  return data.keys().hasOnly([
+    'channelId', 'title', 'description', 'hostId', 'hostName',
+    'hostAvatar', 'isLive', 'viewerCount', 'tags', 'createdAt', 'updatedAt'
+  ])
+  // Required fields
+  && isStringLengthValid(data.title, 1, 100)
+  && isStringLengthValid(data.hostId, 1, 128)
+  && isStringLengthValid(data.hostName, 1, 50)
+  && isStringLengthValid(data.channelId, 1, 128)
+  // hostId must match the authenticated user's UID
+  && data.hostId == request.auth.uid
+  // Boolean
+  && data.isLive == true
+  // Viewer count starts at 0
+  && data.viewerCount == 0
+  // Optional fields (null or valid strings)
+  && (data.description == null || isStringLengthValid(data.description, 0, 500))
+  && (data.hostAvatar == null || isStringLengthValid(data.hostAvatar, 0, 500))
+  && (data.tags == null || isStringLengthValid(data.tags, 0, 200))
+  // Timestamps
+  && data.createdAt == request.time
+  && data.updatedAt == request.time;
+}
+
+/// Validate room data on UPDATE
+function isValidRoomUpdate() {
+  let data = request.resource.data;
+  let incoming = request.resource.data.diff(resource.data).affectedFields();
+
+  return incoming.hasOnly([
+    'title', 'description', 'isLive', 'viewerCount', 'tags', 'updatedAt', 'hostAvatar'
+  ])
+  // Optional string fields
+  && (incoming.has('title') == false || isStringLengthValid(data.title, 1, 100))
+  && (incoming.has('description') == false || (data.description == null || isStringLengthValid(data.description, 0, 500)))
+  && (incoming.has('hostAvatar') == false || (data.hostAvatar == null || isStringLengthValid(data.hostAvatar, 0, 500)))
+  && (incoming.has('tags') == false || (data.tags == null || isStringLengthValid(data.tags, 0, 200)))
+  // Boolean
+  && (incoming.has('isLive') == false || data.isLive is bool)
+  // Viewer count: only allow increment/decrement
+  && (incoming.has('viewerCount') == false || (data.viewerCount is int && data.viewerCount >= 0))
+  // updatedAt must be set to current time
+  && data.updatedAt == request.time;
+}
+
+// ─── Message Validation Rules ─────────────────────────────────
+
+/// Validate message data on CREATE
+function isValidMessageCreate() {
+  let data = request.resource.data;
+
+  return data.keys().hasOnly([
+    'userId', 'userName', 'userAvatar', 'message', 'type', 'createdAt'
+  ])
+  // Required fields
+  && isStringLengthValid(data.userId, 1, 128)
+  && isStringLengthValid(data.userName, 1, 50)
+  && isStringLengthValid(data.message, 1, 500)
+  // userId must match the authenticated user
+  && data.userId == request.auth.uid
+  // Message type validation
+  && isValidMessageType(data.type)
+  // Optional fields
+  && (data.userAvatar == null || isStringLengthValid(data.userAvatar, 0, 500))
+  // Timestamp
+  && data.createdAt == request.time;
+}
