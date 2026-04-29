@@ -3,13 +3,14 @@
  * ─────────────────────
  * Manages user authentication state.
  *
- * On login, the user record is upserted into Firestore so that
- * chat messages and room documents can reference the user by name/avatar.
+ * Login always works LOCALLY (no Firebase dependency).
+ * If Firebase env vars are properly configured, the user profile
+ * is synced to Firestore for chat/room references. If Firebase is
+ * unconfigured (missing NEXT_PUBLIC_FIREBASE_*), login still
+ * succeeds with local state only — no errors thrown.
  */
 import { create } from 'zustand';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import type { User, LoginCredentials, AuthState } from '@/lib/types';
-import { getDb } from '@/lib/firebase';
 
 interface AuthStore extends AuthState {
   login: (credentials: LoginCredentials) => Promise<void>;
@@ -30,26 +31,42 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         .replace(/[^a-z0-9]/gi, '_')
         .toLowerCase();
 
-      // Upsert user document into Firestore
-      const db = getDb();
-      const userRef = doc(db, 'users', emailId);
+      const avatar = `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(credentials.name)}`;
 
-      await setDoc(userRef, {
-        email: credentials.email,
-        name: credentials.name,
-        avatar: `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(credentials.name)}`,
-        role: 'viewer',
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
-
+      // Create user locally — login always succeeds
       const user: User = {
         id: emailId,
         email: credentials.email,
         name: credentials.name,
-        avatar: `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(credentials.name)}`,
+        avatar,
         role: 'viewer',
         createdAt: new Date().toISOString(),
       };
+
+      // Sync user to Firestore ONLY if Firebase is configured
+      try {
+        const { isFirebaseConfigured, getDb } = await import('@/lib/firebase');
+
+        if (!isFirebaseConfigured()) {
+          console.info('[AuthStore] Firebase not configured — skipping Firestore sync');
+        } else {
+          const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+          const db = getDb();
+          const userRef = doc(db, 'users', emailId);
+
+          await setDoc(userRef, {
+            email: credentials.email,
+            name: credentials.name,
+            avatar,
+            role: 'viewer',
+            updatedAt: serverTimestamp(),
+          }, { merge: true });
+
+          console.info('[AuthStore] User synced to Firestore');
+        }
+      } catch (firebaseErr) {
+        console.warn('[AuthStore] Firestore sync failed (non-critical):', firebaseErr);
+      }
 
       set({ user, isAuthenticated: true, isLoading: false });
     } catch (error) {
@@ -68,14 +85,20 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     if (user) {
       set({ user: { ...user, role } });
 
-      // Persist role change to Firestore
-      try {
-        const db = getDb();
-        const userRef = doc(db, 'users', user.id);
-        setDoc(userRef, { role }, { merge: true });
-      } catch {
-        // Non-critical — role is already updated locally
-      }
+      // Optionally persist role change to Firestore (non-critical)
+      (async () => {
+        try {
+          const { isFirebaseConfigured, getDb } = await import('@/lib/firebase');
+          if (!isFirebaseConfigured()) return;
+
+          const { doc, setDoc } = await import('firebase/firestore');
+          const db = getDb();
+          const userRef = doc(db, 'users', user.id);
+          await setDoc(userRef, { role }, { merge: true });
+        } catch {
+          // Non-critical — role is already updated locally
+        }
+      })();
     }
   },
 }));
