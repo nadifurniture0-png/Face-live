@@ -411,3 +411,6 @@ export function createDefaultStreamConfig(
 export function getAgoraChannel(): string {
   return process.env.NEXT_PUBLIC_AGORA_CHANNEL || 'test-live-room';
 }
+
+// ─── Added this line to fix the Vercel Error ───────────────
+export const isAgoraConfigured = !!process.env.NEXT_PUBLIC_AGORA_APP_ID;
